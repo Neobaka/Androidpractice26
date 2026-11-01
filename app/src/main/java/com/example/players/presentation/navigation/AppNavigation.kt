@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -29,13 +29,16 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.players.presentation.common.AppOrange
 import com.example.players.presentation.details.ProductDetailsScreen
+import com.example.players.presentation.favorites.FavoritesScreen
+import com.example.players.presentation.filters.FiltersScreen
 import com.example.players.presentation.list.ProductListScreen
 
 object Routes {
     const val HOME = "home"
     const val LIST = "list"
-    const val VIDEO = "video"
+    const val FAVORITES = "favorites"
     const val NOTIFICATIONS = "notifications"
+    const val FILTERS = "filters"
     const val DETAILS = "details/{productId}"
     fun details(id: Int) = "details/$id"
 }
@@ -45,7 +48,7 @@ private data class BottomItem(val route: String, val label: String, val icon: Im
 private val bottomItems = listOf(
     BottomItem(Routes.HOME, "Главная", Icons.Default.Home),
     BottomItem(Routes.LIST, "Список", Icons.AutoMirrored.Filled.List),
-    BottomItem(Routes.VIDEO, "Видео", Icons.Default.PlayArrow),
+    BottomItem(Routes.FAVORITES, "Избранное", Icons.Default.Favorite),
     BottomItem(Routes.NOTIFICATIONS, "Уведомления", Icons.Default.Notifications)
 )
 
@@ -54,10 +57,11 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val hideBottomBar = currentRoute == Routes.DETAILS || currentRoute == Routes.FILTERS
 
     Scaffold(
         bottomBar = {
-            if (currentRoute != Routes.DETAILS) {
+            if (!hideBottomBar) {
                 NavigationBar(containerColor = Color.White) {
                     bottomItems.forEach { item ->
                         NavigationBarItem(
@@ -91,10 +95,18 @@ fun AppNavigation() {
         ) {
             composable(Routes.HOME) { Placeholder("Главная") }
             composable(Routes.LIST) {
-                ProductListScreen(onProductClick = { navController.navigate(Routes.details(it)) })
+                ProductListScreen(
+                    onProductClick = { navController.navigate(Routes.details(it)) },
+                    onOpenFilters = { navController.navigate(Routes.FILTERS) }
+                )
             }
-            composable(Routes.VIDEO) { Placeholder("Видео") }
+            composable(Routes.FAVORITES) {
+                FavoritesScreen(onProductClick = { navController.navigate(Routes.details(it)) })
+            }
             composable(Routes.NOTIFICATIONS) { Placeholder("Уведомления") }
+            composable(Routes.FILTERS) {
+                FiltersScreen(onClose = { navController.popBackStack() })
+            }
             composable(
                 route = Routes.DETAILS,
                 arguments = listOf(navArgument("productId") { type = NavType.IntType })

@@ -8,22 +8,35 @@ import retrofit2.http.Query
 
 interface ProductsApi {
 
-    /** Список с пагинацией: limit / skip (query-параметры). */
     @GET("products")
     suspend fun getProducts(
         @Query("limit") limit: Int,
-        @Query("skip") skip: Int
+        @Query("skip") skip: Int,
+        @Query("sortBy") sortBy: String?,
+        @Query("order") order: String?
     ): ProductsResponseDto
 
-    /** Поиск по названию: q (query-параметр). */
     @GET("products/search")
     suspend fun searchProducts(
         @Query("q") query: String,
         @Query("limit") limit: Int,
-        @Query("skip") skip: Int
+        @Query("skip") skip: Int,
+        @Query("sortBy") sortBy: String?,
+        @Query("order") order: String?
     ): ProductsResponseDto
 
-    /** Детали: id (path-параметр). */
+    @GET("products/category/{category}")
+    suspend fun getProductsByCategory(
+        @Path("category") category: String,
+        @Query("limit") limit: Int,
+        @Query("skip") skip: Int,
+        @Query("sortBy") sortBy: String?,
+        @Query("order") order: String?
+    ): ProductsResponseDto
+
+    @GET("products/category-list")
+    suspend fun getCategories(): List<String>
+
     @GET("products/{id}")
     suspend fun getProduct(@Path("id") id: Int): ProductDto
 }

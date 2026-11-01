@@ -53,3 +53,7 @@ fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier = Modifie
         }
     }
 }
+
+/** "mens-shirts" -> "Mens shirts" */
+fun categoryTitle(slug: String): String =
+    slug.replace('-', ' ').replaceFirstChar { it.uppercase() }
