@@ -7,8 +7,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.players.App
+import com.example.players.domain.model.FilterSettings
 import com.example.players.domain.model.Product
 import com.example.players.domain.usecase.GetProductsUseCase
+import com.example.players.domain.usecase.ObserveFilterSettingsUseCase
+import com.example.players.presentation.common.FilterBadgeCache
 import com.example.players.presentation.common.toUiMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,31 +24,49 @@ import kotlinx.coroutines.launch
 data class ProductListUiState(
     val query: String = "",
     val items: List<Product> = emptyList(),
-    val isLoading: Boolean = false,       // первая загрузка / новый поиск
-    val isLoadingMore: Boolean = false,   // подгрузка следующей страницы
+    val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
     val error: String? = null,
     val endReached: Boolean = false
 )
 
 class ProductListViewModel(
-    private val getProducts: GetProductsUseCase
+    private val getProducts: GetProductsUseCase,
+    observeFilters: ObserveFilterSettingsUseCase,
+    badgeCache: FilterBadgeCache
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProductListUiState())
     val state: StateFlow<ProductListUiState> = _state.asStateFlow()
 
+    /** Бейдж на кнопке настроек — читается из общего кэша. */
+    val showFilterBadge: StateFlow<Boolean> = badgeCache.isVisible
+
+    private var filters = FilterSettings()
     private var loadJob: Job? = null
     private var searchJob: Job? = null
 
     init {
-        loadFirstPage()
+        // Настройки читаются из DataStore при старте и при каждом сохранении на экране фильтров:
+        // в обоих случаях список перезагружается с актуальными фильтрами.
+        viewModelScope.launch {
+            var first = true
+            observeFilters().collect { saved ->
+                filters = saved
+                if (first) {
+                    badgeCache.setVisible(!saved.isDefault)
+                    first = false
+                }
+                loadFirstPage()
+            }
+        }
     }
 
     fun onQueryChange(query: String) {
         _state.update { it.copy(query = query) }
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MS) // не дёргаем сеть на каждую букву
+            delay(SEARCH_DEBOUNCE_MS)
             loadFirstPage()
         }
     }
@@ -65,7 +86,7 @@ class ProductListViewModel(
 
         _state.update { it.copy(isLoadingMore = true) }
         loadJob = viewModelScope.launch {
-            getProducts(s.query, PAGE_SIZE, s.items.size).fold(
+            getProducts(s.query, filters, PAGE_SIZE, s.items.size).fold(
                 onSuccess = { page ->
                     _state.update {
                         val all = it.items + page.items
@@ -90,7 +111,7 @@ class ProductListViewModel(
             it.copy(isLoading = true, isLoadingMore = false, error = null, items = emptyList(), endReached = false)
         }
         loadJob = viewModelScope.launch {
-            getProducts(query, PAGE_SIZE, 0).fold(
+            getProducts(query, filters, PAGE_SIZE, 0).fold(
                 onSuccess = { page ->
                     _state.update {
                         it.copy(
@@ -113,8 +134,12 @@ class ProductListViewModel(
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app = this[APPLICATION_KEY] as App
-                ProductListViewModel(app.container.getProductsUseCase)
+                val c = (this[APPLICATION_KEY] as App).container
+                ProductListViewModel(
+                    c.getProductsUseCase,
+                    c.observeFilterSettingsUseCase,
+                    c.filterBadgeCache
+                )
             }
         }
     }
